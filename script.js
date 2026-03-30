@@ -34,6 +34,7 @@ const rand = (a, b) => Math.random() * (b - a) + a;
 const randInt = (a, b) => Math.floor(rand(a, b));
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const isMobileViewport = () => window.innerWidth <= 640;
 
 function hexToRgb(hex) {
   const r = parseInt(hex.slice(1,3),16);
@@ -766,7 +767,8 @@ class BioLuminescent extends Scene {
 
   newJelly(y0, depthSeed = Math.random()) {
     const depth = clamp(0.45 + depthSeed * 0.75 + Math.random() * 0.18, 0.45, 1.35);
-    const r = rand(34, 82) * depth;
+    const mobileScale = isMobileViewport() ? 0.72 : 1;
+    const r = rand(34, 82) * depth * mobileScale;
     return {
       depth,
       x: rand(-W*0.06, W*1.06),
@@ -1152,25 +1154,7 @@ class StarNursery extends Scene {
       ctx.fillStyle=`hsla(${p.hue},80%,95%,${p.brightness})`; ctx.fill();
     });
 
-    // Bipolar jets from brightest protostar
-    const ps = this.protostars[0];
-    for(let dir of [-1,1]) {
-      const jg = ctx.createLinearGradient(ps.x, ps.y, ps.x, ps.y + dir*H*0.4);
-      jg.addColorStop(0,`hsla(${ps.hue+20},100%,80%,0.5)`);
-      jg.addColorStop(0.5,`hsla(${ps.hue+30},90%,70%,0.15)`);
-      jg.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.save();
-      ctx.translate(ps.x, ps.y);
-      const jw = ps.r * (2+Math.sin(t*2));
-      ctx.beginPath();
-      ctx.moveTo(-jw,0);
-      ctx.bezierCurveTo(-jw*3, dir*H*0.15, -jw*5, dir*H*0.3, -jw*8, dir*H*0.4);
-      ctx.bezierCurveTo(jw*8, dir*H*0.4, jw*5, dir*H*0.3, jw*3, dir*H*0.15);
-      ctx.lineTo(jw,0);
-      ctx.closePath();
-      ctx.fillStyle=jg; ctx.fill();
-      ctx.restore();
-    }
+    // Removed the spotlight-like bipolar jet effect for a cleaner protostar view.
   }
 }
 
@@ -1695,77 +1679,152 @@ class InfiniteStars extends Scene {
 // ═══════════════════════════════════════════════
 class Wormhole extends Scene {
   init() {
-    this.rings = Array.from({length:40}, (_,i) => ({
-      z: i/39, speed: rand(0.003,0.008)
+    this.rings = Array.from({length:64}, (_,i) => ({
+      z: i/63, speed: rand(0.004,0.010)
     }));
-    this.particles = Array.from({length:300}, () => ({
+    this.particles = Array.from({length:520}, () => ({
       angle: rand(0,Math.PI*2), z: rand(0,1),
-      r: rand(1,3), speed: rand(0.005,0.015), hue: rand(200,300)
+      r: rand(0.8,2.8), speed: rand(0.006,0.018), hue: rand(190,300)
     }));
-    this.stars = Array.from({length:300}, () => ({
-      x:rand(0,W), y:rand(0,H), r:rand(0.2,1.5), a:rand(0.1,0.5)
+    this.bgClouds = Array.from({length:7}, () => ({
+      x: rand(0,W), y: rand(0,H), r: rand(90,260), a: rand(0.03,0.08), hue: rand(220,290)
+    }));
+    this.stars = Array.from({length:460}, () => ({
+      x:rand(0,W), y:rand(0,H), r:rand(0.4,1.8), a:rand(0.15,0.85)
     }));
   }
   draw() {
     const t = this.t * 0.001;
+    const maxR = Math.min(W,H)*0.32;
 
-    ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.fillRect(0,0,W,H);
+    // brighter background so the scene never reads as a black screen on PC
+    const bg = ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,'#090b24');
+    bg.addColorStop(0.45,'#09051a');
+    bg.addColorStop(1,'#02030b');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0,0,W,H);
 
-    this.stars.forEach(s=>{
-      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-      ctx.fillStyle=`rgba(200,200,255,${s.a})`; ctx.fill();
+    this.bgClouds.forEach((c, i) => {
+      const pulse = 0.85 + 0.15*Math.sin(t*(0.5+i*0.08)+i);
+      const g = ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,c.r*pulse);
+      g.addColorStop(0, `hsla(${c.hue}, 100%, 72%, ${c.a*1.15})`);
+      g.addColorStop(0.45, `hsla(${c.hue-10}, 95%, 48%, ${c.a*0.9})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, c.r*pulse, 0, Math.PI*2);
+      ctx.fill();
     });
 
-    ctx.save(); ctx.translate(cx,cy);
-
-    const maxR = Math.min(W,H)*0.42;
-
-    // Tunnel rings
-    this.rings.forEach(ring => {
-      ring.z -= ring.speed;
-      if(ring.z < 0) ring.z = 1;
-      const perspective = 1 / (1 + ring.z * 3);
-      const r = maxR * perspective;
-      const distort = 1 - ring.z;
-      const alpha = clamp(distort * 0.6, 0, 0.5);
-      const hue = lerp(280, 200, ring.z);
+    this.stars.forEach(s=>{
       ctx.beginPath();
-      ctx.ellipse(0,0,r,r*0.6,0,0,Math.PI*2);
-      ctx.strokeStyle=`hsla(${hue},80%,70%,${alpha})`;
-      ctx.lineWidth=clamp(2-ring.z*1.5, 0.3, 2);
+      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(220,230,255,${s.a})`;
+      ctx.fill();
+    });
+
+    ctx.save();
+    ctx.translate(cx,cy);
+
+    // large ambient halo behind the tunnel
+    const halo = ctx.createRadialGradient(0,0,maxR*0.08,0,0,maxR*1.7);
+    halo.addColorStop(0,'rgba(255,255,255,0.20)');
+    halo.addColorStop(0.20,'rgba(165,130,255,0.28)');
+    halo.addColorStop(0.52,'rgba(85,55,210,0.20)');
+    halo.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0,0,maxR*1.7,0,Math.PI*2);
+    ctx.fill();
+
+    // bright portal core
+    const throat = ctx.createRadialGradient(0,0,0,0,0,maxR*0.44);
+    throat.addColorStop(0,'rgba(255,255,255,1)');
+    throat.addColorStop(0.10,'rgba(245,240,255,0.98)');
+    throat.addColorStop(0.28,'rgba(196,170,255,0.90)');
+    throat.addColorStop(0.50,'rgba(118,88,255,0.42)');
+    throat.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = throat;
+    ctx.beginPath();
+    ctx.ellipse(0,0,maxR*0.72,maxR*0.46,0,0,Math.PI*2);
+    ctx.fill();
+
+    // main tunnel rings
+    this.rings.forEach((ring, idx) => {
+      ring.z -= ring.speed;
+      if (ring.z < 0) ring.z = 1;
+      const perspective = 1 / (0.38 + ring.z * 2.0);
+      const r = maxR * perspective * 1.35;
+      const alpha = clamp((1 - ring.z) * 1.2 + 0.10, 0.14, 1);
+      const hue = lerp(288, 198, ring.z);
+      ctx.beginPath();
+      ctx.ellipse(0,0,r,r*0.60,0,0,Math.PI*2);
+      ctx.strokeStyle=`hsla(${hue},100%,78%,${alpha})`;
+      ctx.lineWidth = clamp(5.2 - ring.z*3.3, 1.2, 5.2);
+      ctx.shadowBlur = 24;
+      ctx.shadowColor = `hsla(${hue},100%,72%,${Math.min(alpha,0.72)})`;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      if (idx % 8 === 0) {
+        ctx.beginPath();
+        ctx.ellipse(0,0,r*1.02,r*0.615,0,0,Math.PI*2);
+        ctx.strokeStyle = `rgba(255,255,255,${alpha*0.18})`;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+    });
+
+    // orbiting particles / stars entering the tunnel
+    this.particles.forEach((p) => {
+      p.z -= p.speed;
+      p.angle += 0.020;
+      if (p.z < 0) {
+        p.z = 1;
+        p.angle = rand(0, Math.PI*2);
+      }
+      const perspective = 1/(0.52 + p.z*2.15);
+      const r = maxR * perspective * 1.42;
+      const x = Math.cos(p.angle) * r;
+      const y = Math.sin(p.angle) * r * 0.60;
+      const alpha = clamp((1-p.z)*1.05, 0.10, 0.95);
+      const size = Math.max(1, p.r*perspective*1.8);
+
+      ctx.beginPath();
+      ctx.arc(x,y,size,0,Math.PI*2);
+      ctx.fillStyle=`hsla(${p.hue},100%,84%,${alpha})`;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(x,y);
+      ctx.lineTo(x - Math.cos(p.angle)*size*6, y - Math.sin(p.angle)*size*3.5);
+      ctx.strokeStyle=`hsla(${p.hue},100%,76%,${alpha*0.45})`;
+      ctx.lineWidth = Math.max(0.8, size*0.9);
       ctx.stroke();
     });
 
-    // Particles spiraling in
-    this.particles.forEach((p,i) => {
-      p.z -= p.speed;
-      p.angle += 0.02;
-      if(p.z < 0) { p.z=1; p.angle=rand(0,Math.PI*2); }
-      const perspective = 1/(1+p.z*3);
-      const r = maxR * perspective;
-      const x = Math.cos(p.angle) * r;
-      const y = Math.sin(p.angle) * r * 0.6;
-      const alpha = clamp((1-p.z)*0.8, 0, 0.8);
-      ctx.beginPath(); ctx.arc(x,y,p.r*perspective,0,Math.PI*2);
-      ctx.fillStyle=`hsla(${p.hue},100%,80%,${alpha})`; ctx.fill();
-    });
+    // outer lensing rim, bright and visible instead of dark occlusion
+    const rim = ctx.createRadialGradient(0,0,maxR*0.95,0,0,maxR*1.42);
+    rim.addColorStop(0,'rgba(0,0,0,0)');
+    rim.addColorStop(0.30,'rgba(180,150,255,0.16)');
+    rim.addColorStop(0.62,'rgba(118,85,255,0.20)');
+    rim.addColorStop(0.88,'rgba(40,20,90,0.12)');
+    rim.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = rim;
+    ctx.beginPath();
+    ctx.arc(0,0,maxR*1.42,0,Math.PI*2);
+    ctx.fill();
 
-    // Center portal
-    const pg = ctx.createRadialGradient(0,0,0,0,0,maxR*0.12);
-    pg.addColorStop(0,`rgba(250,240,255,${0.9+0.1*Math.sin(t*5)})`);
-    pg.addColorStop(0.3,'rgba(200,150,255,0.4)');
-    pg.addColorStop(0.7,'rgba(100,50,200,0.1)');
-    pg.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=pg; ctx.fillRect(-maxR,-maxR,maxR*2,maxR*2);
-
-    // Outer edge
-    const eg=ctx.createRadialGradient(0,0,maxR*0.85,0,0,maxR*1.05);
-    eg.addColorStop(0,'rgba(0,0,0,0)');
-    eg.addColorStop(0.5,`rgba(80,40,180,${0.4+0.1*Math.sin(t*2)})`);
-    eg.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=eg; ctx.beginPath(); ctx.arc(0,0,maxR*1.05,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(0,0,maxR,0,Math.PI*2);
-    ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.fill();
+    // front guide arcs to make the bridge shape obvious on large screens
+    for (let i=0; i<4; i++) {
+      const scale = 1.04 + i*0.12 + Math.sin(t*0.8+i)*0.01;
+      ctx.beginPath();
+      ctx.ellipse(0,0,maxR*scale,maxR*0.60*scale,0,0,Math.PI*2);
+      ctx.strokeStyle = `rgba(170,145,255,${0.18 - i*0.03})`;
+      ctx.lineWidth = Math.max(1.2, maxR*0.012 - i*0.3);
+      ctx.stroke();
+    }
 
     ctx.restore();
   }
@@ -2231,7 +2290,6 @@ const SCENES = [
   { name: 'BIOLUMINESCENT OCEAN',   nameKr: '생물발광 우주 바다',              SceneClass: BioLuminescent },
   { name: 'GOLDEN GALAXY SPIRAL',   nameKr: '황금 나선 은하',                  SceneClass: GoldenSpiral   },
   { name: 'AURORA IN SPACE',        nameKr: '우주의 오로라',                   SceneClass: AuroraSpace    },
-  { name: 'WORMHOLE',               nameKr: '아인슈타인-로젠 다리',            SceneClass: Wormhole       },
   { name: 'BLACK HOLE',             nameKr: '블랙홀 강착원반',                 SceneClass: BlackHole      },
   { name: 'COSMIC WEB',             nameKr: '우주 거대구조 — 암흑물질 필라멘트', SceneClass: CosmicWeb    },
   { name: 'PULSAR MAGNETOSPHERE',   nameKr: '펄사 자기권',                    SceneClass: Pulsar         },
@@ -2344,7 +2402,9 @@ function loop(ts) {
 document.getElementById('controls').addEventListener('click', (e)=>{
   if (document.body.classList.contains('menu-open')) return;
   if (e.target.closest('#dots, #menu-button, #side-menu')) return;
-  nextScene();
+  const clickX = typeof e.clientX === 'number' ? e.clientX : W * 0.5;
+  if (clickX < W * 0.5) prevScene();
+  else nextScene();
 });
 
 function toggleMenu(force) {
