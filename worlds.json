@@ -1,0 +1,37 @@
+[
+  {
+    "id": "jellyfish-nebula",
+    "nameKr": "해파리 성운",
+    "nameEn": "Jellyfish Nebula",
+    "video": "./worlds/jellyfish-nebula/video.mp4",
+    "poster": "./worlds/jellyfish-nebula/poster.jpg"
+  },
+  {
+    "id": "aurora-planet",
+    "nameKr": "오로라 행성",
+    "nameEn": "Aurora Planet",
+    "video": "./worlds/aurora-planet/video.mp4",
+    "poster": "./worlds/aurora-planet/poster.jpg"
+  },
+  {
+    "id": "galactic-core",
+    "nameKr": "은하 중심",
+    "nameEn": "Galactic Core",
+    "video": "./worlds/galactic-core/video.mp4",
+    "poster": "./worlds/galactic-core/poster.jpg"
+  },
+  {
+    "id": "cosmic-storm",
+    "nameKr": "우주 폭풍",
+    "nameEn": "Cosmic Storm",
+    "video": "./worlds/cosmic-storm/video.mp4",
+    "poster": "./worlds/cosmic-storm/poster.jpg"
+  },
+  {
+    "id": "deep-space",
+    "nameKr": "심우주",
+    "nameEn": "Deep Space",
+    "video": "./worlds/deep-space/video.mp4",
+    "poster": "./worlds/deep-space/poster.jpg"
+  }
+]

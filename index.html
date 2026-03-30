@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>우주멍 — Cosmic Drift Video Edition</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Noto+Sans+KR:wght@300;400;500&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      color: #fff;
+      cursor: default;
+      background:
+        radial-gradient(circle at center, rgba(30, 40, 60, 0.18), transparent 45%),
+        linear-gradient(180deg, #02040a 0%, #010205 100%);
+    }
+    .app, .media-wrap, video, .poster-fallback, .shade, .vignette { position: fixed; inset: 0; }
+    .media-wrap { overflow: hidden; background: #000; }
+    video {
+      width: 100%; height: 100%; object-fit: cover; background: #000;
+      filter: saturate(1.08) contrast(1.04) brightness(0.98);
+    }
+    .poster-fallback {
+      display: none;
+      background-size: cover; background-position: center;
+      filter: saturate(1.04) brightness(0.95);
+    }
+    body.use-poster .poster-fallback { display: block; }
+    .shade {
+      background:
+        linear-gradient(180deg, rgba(0,0,0,0.30), rgba(0,0,0,0.00) 25%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0.40)),
+        radial-gradient(circle at center, transparent 46%, rgba(0,0,0,0.22));
+      pointer-events: none;
+      z-index: 3;
+    }
+    .vignette {
+      box-shadow: inset 0 0 120px rgba(0,0,0,0.72), inset 0 0 250px rgba(0,0,0,0.28);
+      pointer-events: none;
+      z-index: 4;
+    }
+    #menuButton {
+      position: fixed; top: 22px; left: 22px; z-index: 30;
+      width: 52px; height: 52px; border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 16px; background: rgba(9, 12, 22, 0.48); backdrop-filter: blur(14px);
+      display: grid; place-items: center; cursor: pointer;
+      transition: transform .2s ease, background .2s ease;
+    }
+    #menuButton:hover { transform: translateY(-1px); background: rgba(18, 24, 38, 0.7); }
+    .burger, .burger::before, .burger::after {
+      content: ''; display: block; width: 19px; height: 2px; border-radius: 999px;
+      background: rgba(255,255,255,0.92); transition: .25s ease;
+    }
+    .burger { position: relative; }
+    .burger::before { position: absolute; top: -6px; }
+    .burger::after { position: absolute; top: 6px; }
+    body.menu-open .burger { background: transparent; }
+    body.menu-open .burger::before { transform: translateY(6px) rotate(45deg); }
+    body.menu-open .burger::after { transform: translateY(-6px) rotate(-45deg); }
+    #backdrop {
+      position: fixed; inset: 0; z-index: 24; background: rgba(0,0,0,0.34);
+      opacity: 0; pointer-events: none; transition: opacity .25s ease;
+    }
+    body.menu-open #backdrop { opacity: 1; pointer-events: auto; }
+    #sideMenu {
+      position: fixed; inset: 0 auto 0 0; width: min(360px, 86vw); z-index: 25;
+      padding: 88px 20px 24px; transform: translateX(-104%);
+      transition: transform .28s ease;
+      background: linear-gradient(180deg, rgba(7,10,18,0.92), rgba(8,10,16,0.86));
+      border-right: 1px solid rgba(255,255,255,0.12); backdrop-filter: blur(18px);
+      box-shadow: 16px 0 48px rgba(0,0,0,0.36);
+      overflow-y: auto;
+    }
+    body.menu-open #sideMenu { transform: translateX(0); }
+    .menu-title { font-size: 13px; letter-spacing: .08em; color: rgba(255,255,255,0.9); margin-bottom: 12px; }
+    .menu-sub { font-size: 12px; color: rgba(255,255,255,0.52); margin-bottom: 14px; line-height: 1.6; }
+    .menu-card {
+      padding: 14px; border-radius: 18px; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09); margin-bottom: 14px;
+    }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .toggle-label { font-size: 14px; color: rgba(255,255,255,0.92); }
+    .toggle {
+      position: relative; width: 56px; height: 32px; border-radius: 999px;
+      background: rgba(255,255,255,0.14); cursor: pointer; border: 1px solid rgba(255,255,255,0.10);
+    }
+    .toggle::after {
+      content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+      background: #fff; transition: transform .22s ease;
+    }
+    .toggle.on { background: rgba(130, 170, 255, 0.48); }
+    .toggle.on::after { transform: translateX(24px); }
+    .button-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .timer-btn, .jump-btn {
+      border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color: #fff;
+      border-radius: 999px; padding: 10px 14px; cursor: pointer; font-size: 13px;
+      transition: .2s ease; min-width: 76px;
+    }
+    .timer-btn:hover, .jump-btn:hover { background: rgba(255,255,255,0.14); }
+    .timer-btn.active, .jump-btn.active { background: rgba(255,255,255,0.92); color: #111; }
+    #sceneInfo {
+      position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%); z-index: 12;
+      text-align: center; pointer-events: none; max-width: calc(100vw - 48px);
+      text-shadow: 0 6px 18px rgba(0,0,0,0.38);
+    }
+    #nameEn {
+      font-family: 'Cormorant Garamond', serif; font-size: clamp(18px, 2.2vw, 28px);
+      letter-spacing: .24em; text-transform: uppercase; color: rgba(255,255,255,0.88);
+    }
+    #nameKr {
+      margin-top: 4px; font-size: clamp(11px, 1.5vw, 14px); letter-spacing: .18em; color: rgba(255,255,255,0.48);
+    }
+    #dots {
+      position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 14;
+      display: flex; gap: 8px; padding: 10px 14px; border-radius: 999px;
+      background: rgba(8, 10, 20, 0.26); backdrop-filter: blur(12px);
+      max-width: calc(100vw - 32px); overflow-x: auto;
+    }
+    .dot {
+      width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; cursor: pointer;
+      background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.10);
+      box-shadow: 0 0 16px rgba(255,255,255,0.08); transition: .2s ease;
+    }
+    .dot:hover { transform: scale(1.2); background: rgba(255,255,255,0.54); }
+    .dot.active { transform: scale(1.42); background: rgba(255,255,255,0.95); }
+    #topMeta {
+      position: fixed; top: 24px; right: 24px; z-index: 12; text-align: right;
+      font-size: 11px; letter-spacing: .12em; color: rgba(255,255,255,0.42); text-transform: uppercase;
+      pointer-events: none;
+    }
+    #progress {
+      position: fixed; left: 0; top: 0; height: 2px; width: 0%; z-index: 18;
+      background: linear-gradient(90deg, rgba(255,255,255,0.25), rgba(255,255,255,0.88));
+    }
+    #statusToast {
+      position: fixed; left: 50%; top: 22px; transform: translateX(-50%); z-index: 40;
+      padding: 11px 14px; border-radius: 999px; font-size: 12px; letter-spacing: .03em;
+      background: rgba(8, 12, 20, 0.7); border: 1px solid rgba(255,255,255,0.10);
+      backdrop-filter: blur(12px); opacity: 0; pointer-events: none; transition: opacity .2s ease;
+    }
+    #statusToast.show { opacity: 1; }
+    @media (max-width: 768px) {
+      #sceneInfo { bottom: 82px; }
+      #nameEn { font-size: 18px; letter-spacing: .18em; }
+      #sideMenu { width: min(380px, 92vw); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="media-wrap">
+      <video id="spaceVideo" autoplay muted loop playsinline preload="metadata"></video>
+      <div class="poster-fallback" id="posterFallback"></div>
+    </div>
+    <div class="shade"></div>
+    <div class="vignette"></div>
+    <div id="progress"></div>
+    <button id="menuButton" aria-label="메뉴 열기"><span class="burger"></span></button>
+    <div id="backdrop"></div>
+    <aside id="sideMenu">
+      <div class="menu-title">자동으로 다음 우주로 넘기기</div>
+      <div class="menu-sub">영상은 각 우주 폴더의 <strong>video.mp4</strong>, <strong>poster.jpg</strong>를 자동으로 읽습니다.</div>
+      <div class="menu-card">
+        <div class="toggle-row">
+          <div class="toggle-label">자동 전환</div>
+          <button class="toggle on" id="autoplayToggle" aria-label="자동 전환"></button>
+        </div>
+        <div class="button-row" id="timerButtons">
+          <button class="timer-btn active" data-seconds="10">10초</button>
+          <button class="timer-btn" data-seconds="30">30초</button>
+          <button class="timer-btn" data-seconds="60">1분</button>
+        </div>
+      </div>
+      <div class="menu-title">빠른 이동</div>
+      <div class="menu-card">
+        <div class="button-row" id="jumpButtons"></div>
+      </div>
+      <div class="menu-title">작업 체크</div>
+      <div class="menu-sub">각 우주 폴더 안에 파일만 넣으면 됩니다. 코드 수정 없이 바로 반영됩니다.</div>
+    </aside>
+    <div id="topMeta">video loop background</div>
+    <div id="sceneInfo">
+      <div id="nameEn"></div>
+      <div id="nameKr"></div>
+    </div>
+    <div id="dots"></div>
+    <div id="statusToast"></div>
+  </div>
+  <script>
+    const video = document.getElementById('spaceVideo');
+    const posterFallback = document.getElementById('posterFallback');
+    const nameEn = document.getElementById('nameEn');
+    const nameKr = document.getElementById('nameKr');
+    const dots = document.getElementById('dots');
+    const jumpButtons = document.getElementById('jumpButtons');
+    const progress = document.getElementById('progress');
+    const statusToast = document.getElementById('statusToast');
+    const autoplayToggle = document.getElementById('autoplayToggle');
+    const timerButtons = [...document.querySelectorAll('.timer-btn')];
+    const menuButton = document.getElementById('menuButton');
+    const backdrop = document.getElementById('backdrop');
+    let worlds = [];
+    let currentIndex = 0;
+    let autoAdvance = true;
+    let advanceSeconds = 10;
+    let advanceTimer = null;
+    let progressTimer = null;
+
+    function toast(message) {
+      statusToast.textContent = message;
+      statusToast.classList.add('show');
+      clearTimeout(statusToast._t);
+      statusToast._t = setTimeout(() => statusToast.classList.remove('show'), 1800);
+    }
+
+    function setMenu(open) {
+      document.body.classList.toggle('menu-open', open);
+    }
+
+    menuButton.addEventListener('click', () => setMenu(!document.body.classList.contains('menu-open')));
+    backdrop.addEventListener('click', () => setMenu(false));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
+
+    autoplayToggle.addEventListener('click', () => {
+      autoAdvance = !autoAdvance;
+      autoplayToggle.classList.toggle('on', autoAdvance);
+      restartAdvance();
+      toast(autoAdvance ? '자동 전환 켜짐' : '자동 전환 꺼짐');
+    });
+
+    timerButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        advanceSeconds = Number(btn.dataset.seconds);
+        timerButtons.forEach(b => b.classList.toggle('active', b === btn));
+        restartAdvance();
+        toast(`자동 전환 ${advanceSeconds}초`);
+      });
+    });
+
+    function restartAdvance() {
+      clearInterval(advanceTimer);
+      clearInterval(progressTimer);
+      progress.style.width = '0%';
+      if (!autoAdvance || worlds.length <= 1) return;
+      let started = Date.now();
+      progressTimer = setInterval(() => {
+        const ratio = Math.min((Date.now() - started) / (advanceSeconds * 1000), 1);
+        progress.style.width = `${ratio * 100}%`;
+      }, 50);
+      advanceTimer = setInterval(() => {
+        nextWorld();
+      }, advanceSeconds * 1000);
+    }
+
+    function nextWorld() {
+      loadWorld((currentIndex + 1) % worlds.length);
+    }
+
+    function activateNav() {
+      [...dots.children].forEach((dot, i) => dot.classList.toggle('active', i === currentIndex));
+      [...jumpButtons.children].forEach((btn, i) => btn.classList.toggle('active', i === currentIndex));
+    }
+
+    function loadWorld(index) {
+      if (!worlds.length) return;
+      currentIndex = index;
+      const world = worlds[index];
+      nameEn.textContent = world.nameEn || world.name || '';
+      nameKr.textContent = world.nameKr || '';
+      activateNav();
+      document.body.classList.add('use-poster');
+      posterFallback.style.backgroundImage = world.poster ? `url('${world.poster}')` : 'none';
+      video.src = world.video;
+      video.poster = world.poster || '';
+      video.load();
+      const playPromise = video.play();
+      if (playPromise && typeof playPromise.catch === 'function') playPromise.catch(() => {});
+      restartAdvance();
+    }
+
+    video.addEventListener('loadeddata', () => {
+      document.body.classList.remove('use-poster');
+    });
+
+    video.addEventListener('error', () => {
+      document.body.classList.add('use-poster');
+      toast('이 우주 폴더에 video.mp4 또는 poster.jpg를 넣어주세요');
+    });
+
+    async function init() {
+      try {
+        const res = await fetch('./worlds.json', { cache: 'no-store' });
+        worlds = await res.json();
+      } catch (e) {
+        dots.innerHTML = '';
+        jumpButtons.innerHTML = '<div style="font-size:13px;color:rgba(255,255,255,.56);line-height:1.7;">worlds.json을 읽지 못했습니다.</div>';
+        return;
+      }
+      dots.innerHTML = '';
+      jumpButtons.innerHTML = '';
+      worlds.forEach((world, index) => {
+        const dot = document.createElement('button');
+        dot.className = 'dot';
+        dot.title = world.nameKr || world.nameEn || `world ${index + 1}`;
+        dot.addEventListener('click', () => loadWorld(index));
+        dots.appendChild(dot);
+
+        const jump = document.createElement('button');
+        jump.className = 'jump-btn';
+        jump.textContent = world.nameKr || world.nameEn || `우주 ${index + 1}`;
+        jump.addEventListener('click', () => { loadWorld(index); setMenu(false); });
+        jumpButtons.appendChild(jump);
+      });
+      loadWorld(0);
+    }
+
+    init();
+  </script>
+</body>
+</html>
